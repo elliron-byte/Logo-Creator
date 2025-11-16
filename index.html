@@ -27,143 +27,9 @@
 <body>
     <div id="root"></div>
     <script type="text/babel" data-type="module">
-      import React, { useState } from 'react';
+      import React, { useState, useEffect } from 'react';
       import { createRoot } from 'react-dom/client';
       import { GoogleGenAI, Modality } from "@google/genai";
-
-      const App = () => {
-        const [name, setName] = useState('');
-        const [description, setDescription] = useState('');
-        const [color, setColor] = useState('');
-        const [logoUrl, setLogoUrl] = useState('');
-        const [loading, setLoading] = useState(false);
-        const [error, setError] = useState('');
-
-        const handleGenerate = async () => {
-          if (!name || !description || !color) {
-            setError('Please fill out all fields.');
-            return;
-          }
-
-          setLoading(true);
-          setError('');
-          setLogoUrl('');
-
-          try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const prompt = `Create a professional and high-resolution logo for the name "${name}". The logo should be ${description}, with a color scheme of ${color}. The logo must be on a clean, solid white background, suitable for downloading as a high-quality image file.`;
-
-            const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash-image',
-              contents: {
-                parts: [{ text: prompt }],
-              },
-              config: {
-                responseModalities: [Modality.IMAGE],
-              },
-            });
-
-            const candidate = response.candidates?.[0];
-            const partWithImageData = candidate?.content?.parts?.find(p => p.inlineData);
-
-            if (partWithImageData?.inlineData) {
-              const base64ImageBytes = partWithImageData.inlineData.data;
-              const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
-              setLogoUrl(imageUrl);
-            } else {
-              setError('No image was generated. Please try a different prompt.');
-            }
-
-          } catch (e) {
-            console.error(e);
-            setError(`Failed to generate logo. Error: ${e.message}`);
-          } finally {
-            setLoading(false);
-          }
-        };
-
-        const handleDownload = () => {
-          if (!logoUrl) return;
-          const link = document.createElement('a');
-          link.href = logoUrl;
-          link.download = `${name.toLowerCase().replace(/\s+/g, '-')}-logo.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        };
-
-        return (
-          <main style={styles.main}>
-            <div style={styles.container}>
-              <h1 style={styles.title}>Logo Generator</h1>
-              <p style={styles.subtitle}>Create your custom logo with AI</p>
-              
-              <div style={styles.form}>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter name (e.g., 'Aura')"
-                  style={styles.input}
-                  aria-label="Name for the logo"
-                />
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe the logo (e.g., 'minimalist, a mountain icon')"
-                  style={{...styles.input, ...styles.textarea}}
-                  rows={3}
-                  aria-label="Description of the logo"
-                />
-                <input
-                  type="text"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  placeholder="Describe the color (e.g., 'blue and gold')"
-                  style={styles.input}
-                  aria-label="Color scheme for the logo"
-                />
-                <button onClick={handleGenerate} disabled={loading} style={styles.button}>
-                  {loading ? 'Generating...' : 'Generate Logo'}
-                </button>
-              </div>
-
-              {error && <p style={styles.error}>{error}</p>}
-              
-              <div style={styles.resultContainer}>
-                {loading && (
-                  <div style={styles.spinnerContainer}>
-                    <div style={styles.spinner}></div>
-                    <p>Creating your masterpiece...</p>
-                  </div>
-                )}
-                {logoUrl && !loading && (
-                  <div style={styles.logoPreview}>
-                    <img src={logoUrl} alt="Generated Logo" style={styles.logoImage} />
-                    <button onClick={handleDownload} style={styles.downloadButton}>
-                      Download Logo
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </main>
-        );
-      };
-
-      const ApiKeyError = () => (
-        <main style={styles.main}>
-          <div style={styles.container}>
-             <h1 style={styles.title}>Configuration Error</h1>
-             <p style={styles.subtitle}>
-                The AI features of this application cannot be enabled.
-             </p>
-             <p style={{...styles.error, color: '#333', backgroundColor: '#fffbe6', padding: '15px', borderRadius: '8px', border: '1px solid #ffe58f' }}>
-                The necessary API key is not configured for this environment. Please run this application in a valid execution context, such as AI Studio.
-             </p>
-          </div>
-        </main>
-      );
 
       const styles = {
         main: {
@@ -214,7 +80,6 @@
           resize: 'vertical',
           fontFamily: 'inherit',
         },
-
         button: {
           padding: '12px 20px',
           fontSize: '1rem',
@@ -225,6 +90,15 @@
           borderRadius: '8px',
           cursor: 'pointer',
           transition: 'background-color 0.2s',
+        },
+        linkButton: {
+            background: 'none',
+            border: 'none',
+            color: '#007bff',
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            padding: '0',
+            fontSize: '0.9rem'
         },
         error: {
           color: '#dc3545',
@@ -300,19 +174,202 @@
         }
       `;
       document.head.appendChild(styleSheet);
+      
+      const LogoGeneratorApp = ({ apiKey, onClearApiKey }) => {
+        const [name, setName] = useState('');
+        const [description, setDescription] = useState('');
+        const [color, setColor] = useState('');
+        const [logoUrl, setLogoUrl] = useState('');
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
 
+        const handleGenerate = async () => {
+          if (!name || !description || !color) {
+            setError('Please fill out all fields.');
+            return;
+          }
+
+          setLoading(true);
+          setError('');
+          setLogoUrl('');
+
+          try {
+            const ai = new GoogleGenAI({ apiKey });
+            const prompt = `Create a professional and high-resolution logo for the name "${name}". The logo should be ${description}, with a color scheme of ${color}. The logo must be on a clean, solid white background, suitable for downloading as a high-quality image file.`;
+
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash-image',
+              contents: {
+                parts: [{ text: prompt }],
+              },
+              config: {
+                responseModalities: [Modality.IMAGE],
+              },
+            });
+
+            const candidate = response.candidates?.[0];
+            const partWithImageData = candidate?.content?.parts?.find(p => p.inlineData);
+
+            if (partWithImageData?.inlineData) {
+              const base64ImageBytes = partWithImageData.inlineData.data;
+              const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
+              setLogoUrl(imageUrl);
+            } else {
+              setError('No image was generated. Please try a different prompt.');
+            }
+
+          } catch (e) {
+            console.error(e);
+            setError(`Failed to generate logo. Error: ${e.message}`);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const handleDownload = () => {
+          if (!logoUrl) return;
+          const link = document.createElement('a');
+          link.href = logoUrl;
+          link.download = `${name.toLowerCase().replace(/\s+/g, '-')}-logo.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+
+        return (
+          <div style={styles.container}>
+            <h1 style={styles.title}>Logo Generator</h1>
+            <p style={styles.subtitle}>Create your custom logo with AI</p>
+            
+            <div style={styles.form}>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter name (e.g., 'Aura')"
+                style={styles.input}
+                aria-label="Name for the logo"
+              />
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe the logo (e.g., 'minimalist, a mountain icon')"
+                style={{...styles.input, ...styles.textarea}}
+                rows={3}
+                aria-label="Description of the logo"
+              />
+              <input
+                type="text"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                placeholder="Describe the color (e.g., 'blue and gold')"
+                style={styles.input}
+                aria-label="Color scheme for the logo"
+              />
+              <button onClick={handleGenerate} disabled={loading} style={styles.button}>
+                {loading ? 'Generating...' : 'Generate Logo'}
+              </button>
+            </div>
+
+            {error && <p style={styles.error}>{error}</p>}
+            
+            <div style={styles.resultContainer}>
+              {loading && (
+                <div style={styles.spinnerContainer}>
+                  <div style={styles.spinner}></div>
+                  <p>Creating your masterpiece...</p>
+                </div>
+              )}
+              {logoUrl && !loading && (
+                <div style={styles.logoPreview}>
+                  <img src={logoUrl} alt="Generated Logo" style={styles.logoImage} />
+                  <button onClick={handleDownload} style={styles.downloadButton}>
+                    Download Logo
+                  </button>
+                </div>
+              )}
+            </div>
+            <div style={{marginTop: '20px'}}>
+               <button onClick={onClearApiKey} style={styles.linkButton}>Change API Key</button>
+            </div>
+          </div>
+        );
+      };
+      
+      const ApiKeySetup = ({ onSave }) => {
+        const [key, setKey] = useState('');
+
+        const handleSave = () => {
+            if (key.trim()) {
+                onSave(key.trim());
+            }
+        };
+
+        return (
+             <div style={styles.container}>
+                 <h1 style={styles.title}>Setup Required</h1>
+                 <p style={styles.subtitle}>Please enter your Google Gemini API Key to continue.</p>
+                 <div style={{...styles.form, textAlign: 'left'}}>
+                     <input
+                         type="password"
+                         value={key}
+                         onChange={(e) => setKey(e.target.value)}
+                         placeholder="Enter your API Key"
+                         style={styles.input}
+                         aria-label="Google Gemini API Key"
+                     />
+                     <button onClick={handleSave} style={styles.button}>Save and Continue</button>
+                     <p style={{fontSize: '0.8rem', color: '#666', textAlign: 'center', margin: '10px 0 0 0'}}>
+                         You can get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.
+                         Your key is stored securely in your browser's local storage and is never shared.
+                     </p>
+                 </div>
+             </div>
+        );
+      };
+
+      const Main = () => {
+        const [apiKey, setApiKey] = useState(null);
+
+        useEffect(() => {
+            const storedKey = localStorage.getItem('gemini-api-key');
+            if (storedKey) {
+                setApiKey(storedKey);
+            } else {
+                setApiKey(''); // Explicitly set to empty to show setup
+            }
+        }, []);
+
+        const handleApiKeySave = (key) => {
+            localStorage.setItem('gemini-api-key', key);
+            setApiKey(key);
+        };
+
+        const handleApiKeyClear = () => {
+            localStorage.removeItem('gemini-api-key');
+            setApiKey('');
+        };
+
+        if (apiKey === null) {
+            // Still loading the key from storage
+            return null;
+        }
+
+        return (
+            <main style={styles.main}>
+                {apiKey ? (
+                    <LogoGeneratorApp apiKey={apiKey} onClearApiKey={handleApiKeyClear} />
+                ) : (
+                    <ApiKeySetup onSave={handleApiKeySave} />
+                )}
+            </main>
+        );
+      };
 
       const container = document.getElementById('root');
       if (container) {
         const root = createRoot(container);
-        try {
-          if (!process.env.API_KEY) {
-            throw new Error("API_KEY not found");
-          }
-          root.render(<App />);
-        } catch (e) {
-          root.render(<ApiKeyError />);
-        }
+        root.render(<Main />);
       }
     </script>
 </body>
