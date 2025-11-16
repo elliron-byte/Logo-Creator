@@ -7,7 +7,8 @@
     <style>
         body {
             margin: 0;
-            background: linear-gradient(to right, #a8e063, #56ab2f);
+            /* New gradient */
+            background: linear-gradient(to right, #ff7e5f, #feb47b); 
         }
     </style>
 <script type="importmap">
@@ -38,7 +39,7 @@
           justifyContent: 'center',
           alignItems: 'center',
           minHeight: '100vh',
-          background: 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+          background: 'linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%)',
           padding: '20px',
           boxSizing: 'border-box',
         },
@@ -104,6 +105,10 @@
           color: '#dc3545',
           marginTop: '15px',
           wordBreak: 'break-word',
+          backgroundColor: '#f8d7da',
+          padding: '10px',
+          borderRadius: '8px',
+          border: '1px solid #f5c6cb',
         },
         resultContainer: {
           marginTop: '30px',
@@ -215,12 +220,17 @@
               const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
               setLogoUrl(imageUrl);
             } else {
-              setError('No image was generated. Please try a different prompt.');
+              setError('No image was generated. The response may have been blocked. Please try a different prompt.');
             }
 
           } catch (e) {
             console.error(e);
-            setError(`Failed to generate logo. Error: ${e.message}`);
+            // Enhanced error detection
+            if (e.message && e.message.includes("API key not valid")) {
+                setError("The API Key you provided is not valid. Please click 'Change API Key' below and enter a correct key from Google AI Studio.");
+            } else {
+                setError(`An error occurred: ${e.message}`);
+            }
           } finally {
             setLoading(false);
           }
