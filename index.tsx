@@ -1,0 +1,265 @@
+import React, { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { GoogleGenAI, Modality } from "@google/genai";
+
+const App = () => {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [color, setColor] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleGenerate = async () => {
+    if (!name || !description || !color) {
+      setError('Please fill out all fields.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setLogoUrl('');
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const prompt = `Create a professional and high-resolution logo for the name "${name}". The logo should be ${description}, with a color scheme of ${color}. The logo must be on a clean, solid white background, suitable for downloading as a high-quality image file.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+          parts: [{ text: prompt }],
+        },
+        config: {
+          responseModalities: [Modality.IMAGE],
+        },
+      });
+
+      const candidate = response.candidates?.[0];
+      const partWithImageData = candidate?.content?.parts?.find(p => p.inlineData);
+
+      if (partWithImageData?.inlineData) {
+        const base64ImageBytes = partWithImageData.inlineData.data;
+        const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
+        setLogoUrl(imageUrl);
+      } else {
+        setError('No image was generated. Please try a different prompt.');
+      }
+
+    } catch (e) {
+      console.error(e);
+      setError('Failed to generate logo. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!logoUrl) return;
+    const link = document.createElement('a');
+    link.href = logoUrl;
+    link.download = `${name.toLowerCase().replace(/\s+/g, '-')}-logo.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <main style={styles.main}>
+      <div style={styles.container}>
+        <h1 style={styles.title}>Logo Generator</h1>
+        <p style={styles.subtitle}>Create your custom logo with AI</p>
+        
+        <div style={styles.form}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter name (e.g., 'Aura')"
+            style={styles.input}
+            aria-label="Name for the logo"
+          />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe the logo (e.g., 'minimalist, a mountain icon')"
+            style={{...styles.input, ...styles.textarea}}
+            rows={3}
+            aria-label="Description of the logo"
+          />
+          <input
+            type="text"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            placeholder="Describe the color (e.g., 'blue and gold')"
+            style={styles.input}
+            aria-label="Color scheme for the logo"
+          />
+          <button onClick={handleGenerate} disabled={loading} style={styles.button}>
+            {loading ? 'Generating...' : 'Generate Logo'}
+          </button>
+        </div>
+
+        {error && <p style={styles.error}>{error}</p>}
+        
+        <div style={styles.resultContainer}>
+          {loading && (
+            <div style={styles.spinnerContainer}>
+              <div style={styles.spinner}></div>
+              <p>Creating your masterpiece...</p>
+            </div>
+          )}
+          {logoUrl && !loading && (
+            <div style={styles.logoPreview}>
+              <img src={logoUrl} alt="Generated Logo" style={styles.logoImage} />
+              <button onClick={handleDownload} style={styles.downloadButton}>
+                Download Logo
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+};
+
+const styles = {
+  main: {
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#f0f2f5',
+    padding: '20px',
+    boxSizing: 'border-box',
+  },
+  container: {
+    backgroundColor: 'white',
+    padding: '40px',
+    borderRadius: '12px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+    width: '100%',
+    maxWidth: '500px',
+    textAlign: 'center',
+    boxSizing: 'border-box',
+  },
+  title: {
+    fontSize: '2.5rem',
+    color: '#333',
+    margin: '0 0 10px 0',
+  },
+  subtitle: {
+    fontSize: '1rem',
+    color: '#666',
+    marginBottom: '30px',
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px',
+  },
+  input: {
+    width: '100%',
+    padding: '12px 15px',
+    fontSize: '1rem',
+    borderRadius: '8px',
+    border: '1px solid #ddd',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s',
+  },
+  textarea: {
+    resize: 'vertical',
+    fontFamily: 'inherit',
+  },
+
+  button: {
+    padding: '12px 20px',
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    color: 'white',
+    backgroundColor: '#007bff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+  },
+  error: {
+    color: '#dc3545',
+    marginTop: '15px',
+  },
+  resultContainer: {
+    marginTop: '30px',
+    minHeight: '200px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spinnerContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '10px',
+    color: '#555',
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    borderLeftColor: '#007bff',
+    animation: 'spin 1s ease infinite',
+  },
+  logoPreview: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '20px',
+  },
+  logoImage: {
+    maxWidth: '100%',
+    maxHeight: '300px',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+  },
+  downloadButton: {
+    padding: '10px 20px',
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    color: 'white',
+    backgroundColor: '#28a745',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+  },
+};
+
+const styleSheet = document.createElement("style");
+styleSheet.type = "text/css";
+styleSheet.innerText = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  }
+  button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  button:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+`;
+document.head.appendChild(styleSheet);
+
+
+const container = document.getElementById('root');
+if (container) {
+  const root = createRoot(container);
+  root.render(<App />);
+}
