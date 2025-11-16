@@ -7,7 +7,7 @@
     <style>
         body {
             margin: 0;
-            background-color: #f0f2f5;
+            background: linear-gradient(to right, #a8e063, #56ab2f);
         }
     </style>
 <script type="importmap">
@@ -76,7 +76,7 @@
 
           } catch (e) {
             console.error(e);
-            setError('Failed to generate logo. Please try again.');
+            setError(`Failed to generate logo. Error: ${e.message}`);
           } finally {
             setLoading(false);
           }
@@ -151,6 +151,20 @@
         );
       };
 
+      const ApiKeyError = () => (
+        <main style={styles.main}>
+          <div style={styles.container}>
+             <h1 style={styles.title}>Configuration Error</h1>
+             <p style={styles.subtitle}>
+                The AI features of this application cannot be enabled.
+             </p>
+             <p style={{...styles.error, color: '#333', backgroundColor: '#fffbe6', padding: '15px', borderRadius: '8px', border: '1px solid #ffe58f' }}>
+                The necessary API key is not configured for this environment. Please run this application in a valid execution context, such as AI Studio.
+             </p>
+          </div>
+        </main>
+      );
+
       const styles = {
         main: {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
@@ -158,7 +172,7 @@
           justifyContent: 'center',
           alignItems: 'center',
           minHeight: '100vh',
-          backgroundColor: '#f0f2f5',
+          background: 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
           padding: '20px',
           boxSizing: 'border-box',
         },
@@ -215,6 +229,7 @@
         error: {
           color: '#dc3545',
           marginTop: '15px',
+          wordBreak: 'break-word',
         },
         resultContainer: {
           marginTop: '30px',
@@ -290,7 +305,14 @@
       const container = document.getElementById('root');
       if (container) {
         const root = createRoot(container);
-        root.render(<App />);
+        try {
+          if (!process.env.API_KEY) {
+            throw new Error("API_KEY not found");
+          }
+          root.render(<App />);
+        } catch (e) {
+          root.render(<ApiKeyError />);
+        }
       }
     </script>
 </body>
