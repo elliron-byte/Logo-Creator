@@ -28,7 +28,7 @@
 <body>
     <div id="root"></div>
     <script type="text/babel" data-type="module">
-      import React, { useState, useEffect } from 'react';
+      import React, { useState, Fragment } from 'react';
       import { createRoot } from 'react-dom/client';
       import { GoogleGenAI, Modality } from "@google/genai";
 
@@ -92,23 +92,16 @@
           cursor: 'pointer',
           transition: 'background-color 0.2s',
         },
-        linkButton: {
-            background: 'none',
-            border: 'none',
-            color: '#007bff',
-            cursor: 'pointer',
-            textDecoration: 'underline',
-            padding: '0',
-            fontSize: '0.9rem'
-        },
         error: {
-          color: '#dc3545',
+          color: '#721c24',
           marginTop: '15px',
           wordBreak: 'break-word',
           backgroundColor: '#f8d7da',
-          padding: '10px',
+          padding: '15px',
           borderRadius: '8px',
           border: '1px solid #f5c6cb',
+          textAlign: 'left',
+          lineHeight: '1.5',
         },
         resultContainer: {
           marginTop: '30px',
@@ -177,29 +170,34 @@
         button:hover:not(:disabled) {
           opacity: 0.9;
         }
+        .error-link {
+            color: #721c24;
+            font-weight: bold;
+            text-decoration: underline;
+        }
       `;
       document.head.appendChild(styleSheet);
       
-      const LogoGeneratorApp = ({ apiKey, onClearApiKey }) => {
+      const LogoGeneratorApp = () => {
         const [name, setName] = useState('');
         const [description, setDescription] = useState('');
         const [color, setColor] = useState('');
         const [logoUrl, setLogoUrl] = useState('');
         const [loading, setLoading] = useState(false);
-        const [error, setError] = useState('');
+        const [error, setError] = useState(null);
 
         const handleGenerate = async () => {
           if (!name || !description || !color) {
-            setError('Please fill out all fields.');
+            setError('Please fill out all fields to generate your logo.');
             return;
           }
 
           setLoading(true);
-          setError('');
+          setError(null);
           setLogoUrl('');
 
           try {
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const prompt = `Create a professional and high-resolution logo for the name "${name}". The logo should be ${description}, with a color scheme of ${color}. The logo must be on a clean, solid white background, suitable for downloading as a high-quality image file.`;
 
             const response = await ai.models.generateContent({
@@ -225,12 +223,30 @@
 
           } catch (e) {
             console.error(e);
-            // Enhanced error detection
-            if (e.message && e.message.includes("API key not valid")) {
-                setError("The API Key you provided is not valid. Please click 'Change API Key' below and enter a correct key from Google AI Studio.");
-            } else {
-                setError(`An error occurred: ${e.message}`);
+            let errorMessage = `An unexpected error occurred. Please try again. Details: ${e.message}`;
+
+            if (e.message) {
+                if (e.message.includes("API key not valid")) {
+                    errorMessage = "The API Key is not valid. Please ensure it is configured correctly.";
+                } else if (e.message.includes("RESOURCE_EXHAUSTED") || e.message.includes("429")) {
+                    errorMessage = (
+                        <>
+                          It looks like your API key has exceeded its free usage quota. This is a common limit for the free tier.
+                          <br /><br />
+                          To continue generating logos, please check your project's billing status. You can find more information on how to enable billing on{' '}
+                          <a 
+                            href="https://ai.google.dev/gemini-api/docs/billing" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="error-link"
+                          >
+                            Google's documentation
+                          </a>.
+                        </>
+                    );
+                }
             }
+            setError(errorMessage);
           } finally {
             setLoading(false);
           }
@@ -281,7 +297,7 @@
               </button>
             </div>
 
-            {error && <p style={styles.error}>{error}</p>}
+            {error && <div style={styles.error}>{error}</div>}
             
             <div style={styles.resultContainer}>
               {loading && (
@@ -299,87 +315,18 @@
                 </div>
               )}
             </div>
-            <div style={{marginTop: '20px'}}>
-               <button onClick={onClearApiKey} style={styles.linkButton}>Change API Key</button>
-            </div>
           </div>
-        );
-      };
-      
-      const ApiKeySetup = ({ onSave }) => {
-        const [key, setKey] = useState('');
-
-        const handleSave = () => {
-            if (key.trim()) {
-                onSave(key.trim());
-            }
-        };
-
-        return (
-             <div style={styles.container}>
-                 <h1 style={styles.title}>Setup Required</h1>
-                 <p style={styles.subtitle}>Please enter your Google Gemini API Key to continue.</p>
-                 <div style={{...styles.form, textAlign: 'left'}}>
-                     <input
-                         type="password"
-                         value={key}
-                         onChange={(e) => setKey(e.target.value)}
-                         placeholder="Enter your API Key"
-                         style={styles.input}
-                         aria-label="Google Gemini API Key"
-                     />
-                     <button onClick={handleSave} style={styles.button}>Save and Continue</button>
-                     <p style={{fontSize: '0.8rem', color: '#666', textAlign: 'center', margin: '10px 0 0 0'}}>
-                         You can get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.
-                         Your key is stored securely in your browser's local storage and is never shared.
-                     </p>
-                 </div>
-             </div>
-        );
-      };
-
-      const Main = () => {
-        const [apiKey, setApiKey] = useState(null);
-
-        useEffect(() => {
-            const storedKey = localStorage.getItem('gemini-api-key');
-            if (storedKey) {
-                setApiKey(storedKey);
-            } else {
-                setApiKey(''); // Explicitly set to empty to show setup
-            }
-        }, []);
-
-        const handleApiKeySave = (key) => {
-            localStorage.setItem('gemini-api-key', key);
-            setApiKey(key);
-        };
-
-        const handleApiKeyClear = () => {
-            localStorage.removeItem('gemini-api-key');
-            setApiKey('');
-        };
-
-        if (apiKey === null) {
-            // Still loading the key from storage
-            return null;
-        }
-
-        return (
-            <main style={styles.main}>
-                {apiKey ? (
-                    <LogoGeneratorApp apiKey={apiKey} onClearApiKey={handleApiKeyClear} />
-                ) : (
-                    <ApiKeySetup onSave={handleApiKeySave} />
-                )}
-            </main>
         );
       };
 
       const container = document.getElementById('root');
       if (container) {
         const root = createRoot(container);
-        root.render(<Main />);
+        root.render(
+            <main style={styles.main}>
+                <LogoGeneratorApp />
+            </main>
+        );
       }
     </script>
 </body>
